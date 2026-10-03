@@ -41,9 +41,13 @@ RUN wget -O /tmp/longcat-setup.py \
 # Применяем патч
 RUN python3 /tmp/patch_audio_condition.py run_demo_avatar_single_audio_to_video.py
 
+# ДОБАВЛЕНО: путь к cuDNN 9 внутри venv (иначе import torch падает: libcudnn.so.9 not found)
+ENV LD_LIBRARY_PATH=/opt/LongCat-Video/.venv/lib/python3.10/site-packages/nvidia/cudnn/lib:${LD_LIBRARY_PATH}
+
 # Создаем виртуальное окружение и устанавливаем зависимости
 RUN python3.10 -m venv .venv \
     && .venv/bin/python -m pip install --upgrade pip setuptools wheel \
+    && .venv/bin/python -m pip install nvidia-cudnn-cu12 \
     && .venv/bin/python /tmp/longcat-setup.py install_requirements \
        --avatar --use-system-cuda --project-dir /opt/LongCat-Video \
     && .venv/bin/python -m pip install onnxruntime-gpu accelerate runpod mutagen

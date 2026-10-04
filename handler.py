@@ -21,6 +21,20 @@ WEIGHTS_DIR = os.environ.get("WEIGHTS_DIR", "/workspace/weights")
 AVATAR_CKPT_DIR = os.path.join(WEIGHTS_DIR, "LongCat-Video-Avatar-1.5")
 TMP_ROOT = "/workspace/tmp"
 
+# Файлы, которые обязаны присутствовать в LongCat-Video-Avatar-1.5.
+# Список составлен по реальной структуре папки на Network Volume:
+# config.json лежит НЕ в корне, а в подпапках base_model_int8/ и
+# whisper-large-v3/, поэтому проверка корневого config.json всегда
+# падала с "Веса не найдены", даже когда все веса были на месте.
+REQUIRED_WEIGHT_FILES = [
+    os.path.join("base_model_int8", "config.json"),
+    os.path.join("base_model_int8", "quantization_config.json"),
+    os.path.join("base_model_int8", "quantized_model.safetensors.index.json"),
+    os.path.join("lora", "dmd_lora.safetensors"),
+    os.path.join("whisper-large-v3", "model.safetensors"),
+    os.path.join("vocal_separator", "Kim_Vocal_2.onnx"),
+]
+
 # Из README провалидированной сборки: один сегмент — 93 кадра при
 # 25 fps ≈ 3.72 сек. --num_segments задаётся вручную (сам скрипт не
 # подстраивает длину под длительность аудио автоматически) — считаем
@@ -50,12 +64,17 @@ def ensure_weights_present():
     (см. инструкцию деплоя), а не на холодном старте воркера. Если их
     нет — explicit ошибка с понятной подсказкой, а не попытка скачать
     42 ГБ посреди обработки запроса (упёрлось бы в execution timeout)."""
-    marker = os.path.join(AVATAR_CKPT_DIR, "config.json")
-    if not os.path.exists(marker):
+    missing = [
+        rel for rel in REQUIRED_WEIGHT_FILES
+        if not os.path.exists(os.path.join(AVATAR_CKPT_DIR, rel))
+    ]
+    if missing:
         raise RuntimeError(
-            f"Веса LongCat не найдены в {AVATAR_CKPT_DIR}. Запусти download_weights.py "
-            "один раз через обычный Pod на этом же Network Volume перед первым запросом "
-            "к serverless-эндпоинту — см. инструкцию деплоя."
+            f"Веса LongCat не найдены или неполные в {AVATAR_CKPT_DIR}. "
+            f"Отсутствуют файлы: {', '.join(missing)}. "
+            "Запусти download_weights.py один раз через обычный Pod на этом же "
+            "Network Volume перед первым запросом к serverless-эндпоинту — "
+            "см. инструкцию деплоя."
         )
 
 

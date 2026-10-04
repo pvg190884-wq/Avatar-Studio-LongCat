@@ -42,6 +42,12 @@ REQUIRED_WEIGHT_FILES = [
 # чтобы не обрезать речь и не генерировать лишнее.
 SECONDS_PER_SEGMENT = 3.72
 
+# Вес аудио-эмбеддинга: чем ниже, тем сдержаннее мимика (и тем слабее
+# жёсткость привязки к аудио). Исходное значение провалидированной сборки —
+# 0.70; по умолчанию стоит 0.65 (чуть спокойнее). Подстраивается без
+# пересборки образа через env-переменную AUDIO_CONDITION_SCALE на эндпоинте.
+AUDIO_CONDITION_SCALE = os.environ.get("AUDIO_CONDITION_SCALE", "0.65")
+
 # LongCat не использует отдельные pose-шаблоны, как EchoMimicV2 —
 # стиль подачи (мимика/интонация) задаётся естественным текстовым
 # промптом, который модель интерпретирует сама. Это тот же список
@@ -50,10 +56,10 @@ SECONDS_PER_SEGMENT = 3.72
 # распознавания эмоций.
 EMOTION_TO_PROMPT_HINT = {
     "neutral": "speaking calmly and naturally to the camera",
-    "happy": "speaking cheerfully with a warm, genuine smile",
-    "sad": "speaking gently with a subdued, thoughtful expression",
-    "angry": "speaking firmly with a serious, intense expression",
-    "surprised": "speaking with an animated, surprised expression",
+    "happy": "speaking naturally with a slight, subtle smile",
+    "sad": "speaking gently with a calm, restrained expression",
+    "angry": "speaking firmly with a serious but controlled expression",
+    "surprised": "speaking with a mildly surprised, restrained expression",
 }
 DEFAULT_PROMPT_HINT = EMOTION_TO_PROMPT_HINT["neutral"]
 
@@ -87,7 +93,10 @@ def get_audio_duration_seconds(audio_path: str) -> float:
 
 def build_prompt(emotion) -> str:
     hint = EMOTION_TO_PROMPT_HINT.get((emotion or "").lower(), DEFAULT_PROMPT_HINT)
-    return f"A person {hint}, in a realistic, professional setting."
+    return (
+        f"A person {hint}, in a realistic, professional setting. "
+        "Subtle, restrained facial expressions, minimal head movement."
+    )
 
 
 def run_longcat_inference(image_path: str, audio_path: str, emotion) -> tuple[str, str]:
@@ -130,7 +139,7 @@ def run_longcat_inference(image_path: str, audio_path: str, emotion) -> tuple[st
         # "естественно, но спокойнее" для 48 ГБ карт; дистиллированный
         # режим всё равно фиксирует text/audio guidance на 1.0 — эта
         # настройка снижает именно вес аудио-эмбеддинга, не скорость.
-        "--audio_condition_scale", "0.70",
+        "--audio_condition_scale", str(AUDIO_CONDITION_SCALE),
     ]
 
     start_time = time.time()
@@ -187,4 +196,3 @@ def handler(event):
 
 
 runpod.serverless.start({"handler": handler})
-  
